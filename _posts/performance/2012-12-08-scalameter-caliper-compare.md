@@ -5,7 +5,9 @@ category : peformance
 tags : [scalameter, caliper, benchmark, scala]
 ---
 
-# Timing a while loop
+# Benchmark results
+
+### Timing a while loop
 
 First, let's set up some arrays to use in out benchmarks:
 {% highlight scala %}
@@ -45,7 +47,7 @@ Here is the code we will use for our benchmarks:
     }
 {% endhighlight %}
 
-## The results
+### The results
 
 Caliper:
 {% highlight bash %}
@@ -86,7 +88,53 @@ Scalameter:
 
 {% endhighlight %}
 
+### Timing finding the 40th fibonacci number
+
+The code:
+
+{% highlight scala %}
+def fibonacci(n:Int):Unit = {
+  if (n < 0) throw new IllegalArgumentException("n = " + n + " < 0")
+  def _f(x:Int):Int = {
+    if (x <= 1) n else { _f(x - 1) + _f(x - 2) }
+  }
+  _f(n)
+}                          
+{% endhighlight %}
+
+### The results
+Caliper:
+{% highlight bash %}
+[info] 80% Scenario{vm=java, trial=0, benchmark=fibonacci} 556474178.00 ns; σ=4617459.68 ns @ 3 trials
+[info] 
+[info]            benchmark     ms linear runtime
+[info]            fibonacci 556.47 
+{% endhighlight %}
+
+
+Scalameter:
+{% highlight bash %}
+[info] ::Benchmark fibonacci::
+[info] cores: 4
+[info] hostname: Quasar
+[info] jvm-name: Java HotSpot(TM) Server VM
+[info] jvm-vendor: Oracle Corporation
+[info] jvm-version: 21.0-b17
+[info] os-arch: i386
+[info] os-name: Linux
+[info] Parameters(limit -> 40): 541.119767
+{% endhighlight %}
+
+
+
+
 I noticed with consecutive runs that the run times reported by scalameter were consistently shorter than those reported by caliper.
+
+
+# How long do they take to run?
+
+# Why the difference?
+
 
 *The code for the comparison can be found [here](http://github.com/lossyrob/scalameter-caliper)*
 
