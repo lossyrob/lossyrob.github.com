@@ -177,9 +177,75 @@ To run in consecutive slices:
   
 Now scalameter is reporting the benchmark only takes around 5.2 ms. Consistently.
 Caliper is still reporting 4.60,4.71...
+Now scalameter is back up to 38.08!
+
+## Monday, December 11
+
+Running scalameter and caliper back to back now. Here's the results of running a the int while loop in each, consecutively:
 
 
-*The code for the comparison can be found [here](http://github.com/lossyrob/scalameter-caliper)*
+    [info] Running scalpel.ScalpelRunner 
+
+    Caliper measure time: 4.615950835680751 ms
+    Scalameter time data: 38.170374
+
+    Caliper measure time: 4.386483468208092 ms
+    Scalameter time data: 38.390352
+
+    Caliper measure time: 4.599671330275229 ms
+    Scalameter time data: 37.580277
+
+    Caliper measure time: 4.601634201834862 ms
+    Scalameter time data: 37.494863
+
+    Caliper measure time: 4.6161024272445825 ms
+    Scalameter time data: 38.304218
+
+    Caliper measure time: 5.747781575144509 ms
+    Scalameter time data: 5.826549
+    [success] Total time: 180 s, completed Dec 11, 2012 12:10:28 AM
+
+As you can see, the last run through is the only one where there is matching, and caliper reports a 1 ms performance hit. What is going on here?
+
+This is the result of running caliper and scalameter again, but with the first scalameter run being with a SeperateJvmsExecutor and the second with a LocalExecutor:
+
+    [info] Running scalpel.ScalpelRunner 
+
+    Caliper measure time: 4.5892122018348624 ms
+    Scalameter time data: 37.545266
+    Scalameter time data: 4.313085
+
+    Caliper measure time: 4.642768888888889 ms
+    Scalameter time data: 38.154935
+    Scalameter time data: 4.216995
+
+    Caliper measure time: 4.665680329192546 ms
+    Scalameter time data: 37.629374
+    Scalameter time data: 4.204
+
+    Caliper measure time: 4.627782194444444 ms
+    Scalameter time data: 38.260855
+    Scalameter time data: 4.344657
+
+    Caliper measure time: 4.643496628273662 ms
+    Scalameter time data: 38.834667
+    Scalameter time data: 4.318518
+
+    Caliper measure time: 4.67964090625 ms
+    Scalameter time data: 38.338802
+    Scalameter time data: 4.302616
+
+Clearly something is going awry with scalameter's SeperateJvmsExecutor. The local executor seems to be consistent, and line up at least down to the millisecond with caliper. So the question is, what is wrong with scalameter's SeperateJvmsExecutor logic? Why does it tack on an extra 34 milliseconds to the measurments, consistently but not constantly?
+
+The next step is to really understand the internals of caliper, and know:
+    
+* how the benchmark subprocess executes the measurements
+* What preperations are done to the JVM in order to prepare it for the benchmark code
+
+The scalameter subprocess benchmark
+
+# Code
+The code for the comparison can be found [here](http://github.com/lossyrob/scalameter-caliper) and [here](http://github.com/lossyrob/scalpel)
 
 
 
