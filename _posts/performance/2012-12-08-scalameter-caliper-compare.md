@@ -179,7 +179,7 @@ Now scalameter is reporting the benchmark only takes around 5.2 ms. Consistently
 Caliper is still reporting 4.60,4.71...
 Now scalameter is back up to 38.08!
 
-## Monday, December 11
+## Monday, December 10
 
 Running scalameter and caliper back to back now. Here's the results of running a the int while loop in each, consecutively:
 
@@ -242,10 +242,77 @@ The next step is to really understand the internals of caliper, and know:
 * how the benchmark subprocess executes the measurements
 * What preperations are done to the JVM in order to prepare it for the benchmark code
 
-The scalameter subprocess benchmark
+The scalameter subprocess benchmark...
+
+## Google Caliper InProcessRunner
+
+The InProcessRunner class is what is called to run on the benchmark subprocess jvm. It is called with the suite class name. 
+
+- The InProcessesRunner parses the arguments to extract the proper Scenario and Measurer. 
+- The measurer has a run function which is called with a Supplier[ConfiguredBenchmark]. Some oldie but goodie factory design patterns. All to create () => scenarioSelection.CreateBenchmark(scenario). A great example of the tersness of having functions as first class citizens **say better**. There's AllocationMeasurer, DebugMeasurer, and TimeMeasurer. TimeMeasurer taks as parameters warmup milliseconds and run millisceconds. The warmup time is how long a while loop executes that runs the benchmark, as a warmup run.
+
+Scalameter's final run code:
+
+
+    val start = System.nanoTime
+    snippet(value)
+    val end = System.nanoTime
+
+Caliper's final run code:
+
+    long startNanos = System.nanoTime();
+    benchmark.run(reps);
+    long endNanos = System.nanoTime();
+ 
+Let's explore what the lines benchmark.run(reps) and snippet(value) are really doing.
+
+### benchmark.run(reps)
+benchmark is of type ConfiguredBenchmark. ConfiguredBenchmark is an abstract class with a run. Except for run and close, which are abstract, it is a simple wrapper of a Benchmark. 
+Simplebenchmark createsBenchmark with parameter values, including the function name. A ConfiguredBenchmark is returned with the run function calling the benchmark method with the 
+number of reps. So, run is a function defined on an anonymous instance of ConfiguredBenchmark, that is assigned to run the method *on a copy of the benchmark using reflection*. My assumption
+is that this more direction link to the method might be the answer to the difference in execution times.
+
+### snippet(value)
+snippit is an anonymous function passed in as a function argument that is of type T => Any. Right there it seems like a direct possibility for slowness with boxing parameter values. Caliper calls a function with one integer parameter in a non-boxed way.
+
+The 'Executor' in scalameter is the solder point. Specifically, the code that runs the new JVM (which seems very silimar between caliper and scalameter, no big difference there) should be the InProcessRunner of caliper. The in processer runner should execute how caliper executes. It should be modified to return Scalameter's measurement data type. At that point scalameter's reporting framework would display the data. This reporting framework should encorporate the ConsoleReporter as the default log reporter (display the caliper histogram, because it's awesome and as a point of reference to initial users). 
+
+The current path to port caliper's internals into scalpel will be to continue to peel back caliper, rewriting the peeled code to use CurveData in scala.
+First I need to have caliper run through scala meter. Then pinch out the point of translation between scalameter configuration internal type representaitons into caliper external type representations, connecting the internal representaitons of measurement data.
+
+To be able to create my own versions of data types, translation objects will contain functions that take one project's data type and parse it into an internal data type. There will be getters that will translate it the data typed used by the second project. In this way the 'translator' objects are mapping functions TScalaMeter => TInternal and TInternal => TCaliper in the case of benchmark setup, or TCaliper => TInternal and TInternal => TScalaMeter in the case of measurement data (MeasurementSet -> CurveData). 
+
+Create translation methods described above for solder points, then push down java code and forward scala code for port.
+
+## Wednesday, December 12 - 0058e40 
+
+Fuck yeah! I have caliper almost executing tests dictated by scalameter. I've got a game plan. We're in business.
+
+The next step will be to flesh out the translation layer. I've been trying pretty hard to keep the scalpel namespace clean, and only reference scalameter and caliper type with qualified names. Also, I've created a 'port' namespace that I will use to transition caliper code from java to scala. Anything with 'port' is in caliper land.
+
+After fleshing out the translation layer, which should end in full test running from scalameter of caliper benchmarks, I want to try and fix the problem of abstraction between the benchmark types.
+
+## Definition of Benchmarks
+
+Caliper defines it's benchmark as a class containing a set of methods, taking only an integer parameter, that are to be **directly called** from the benchmark running code (InProcessRunner). Scalameter defines a very usable and intuitive DSL to define benchmarks. It walks up a tree of definitions and creates a Setup[T] that represents the benchmark. Included in that setup is an abstraction of the benchmark code. When the function that is passed to the seperate JVM for execution is serialized, it closes on all the state necessary for executing the function, including the setup, containing the benchmark code. This is a lot of abstraction between what actually calls the benchmark code, and how it ends up running it. With caliper, a copy of the benchmark object is made (so all state is held in the JVM in an object), and the method is called directly on that object representation. The less you have between the call of the benchmark code and the code under test, the more accurate the measurement. All code between the function call in between System.nanoTime calls and the code under test is a liability. 
+
+* **The goal is to reduce that liability by making the call-to-code footprint as small as possible **
+
+I'm hoping macros could help in allowing as beautiful of an interface as scalameter has, while beating both of them in results.
+
+Tonight's goal: port caliper.MeasurementSet.
+
+It's not going to be that easy, class based....it's probably going to happen in big steps. Finding the cutoff points at each step is going to be tricky. But I must continually be leaping to compile points, and that requires scope.
+
+[check irc logs]
+
+## Saturday, December 15th
+
+[irc]
+The intrusion technique did not work. It caused deep problems that caused caliper to stop running. Even with only supplanting Measurement. Learning from mistakes.
+
+Plan of attack: Create ScalpelBenchmark, which uses CaliperExecutor, get it to run. That is the solder point. Then push through the port of the main internals from there. There will have to be two classes, a seperate benchmark class to contain the caliper code, one SMBenchmark that contains the SM code. Then port the ConsoleReport because it's awesome and I want the output.
 
 # Code
 The code for the comparison can be found [here](http://github.com/lossyrob/scalameter-caliper) and [here](http://github.com/lossyrob/scalpel)
-
-
 
