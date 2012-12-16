@@ -5,6 +5,8 @@ category : peformance
 tags : [scalameter, caliper, benchmark, scala]
 ---
 
+# THIS IS OBVIOUSLY A WORK IN PROGRESS. So don't read any of it. Or do, I don't care, just make sure you read the final post.
+
 # Benchmark results
 
 ### Timing a while loop
